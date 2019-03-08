@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -33,26 +34,29 @@ import android.webkit.WebViewClient;
 import android.widget.ImageButton;
 import android.widget.Toast;
 
+import java.util.Objects;
+
 public class MainActivity extends AppCompatActivity {
 
-    public static final String TAG = MainActivity.class.getName();
+    private static final String TAG = MainActivity.class.getName();
 
-    public static final String START_URL = "https://budgetflotta.force.com/portal/s/login/"; //https://dev-budgetflotta.cs85.force.com/portal/s/login/";
+    private static final String START_URL = "https://budgetflotta.force.com/portal/CommunityLoginPage"; //"https://dev-budgetflotta.cs85.force.com/portal/CommunityLoginPage";
     private WebView myWebView;
 
 
     private ValueCallback mUploadMessage;
-    public ValueCallback<Uri[]> uploadMessage;
-    public static final int REQUEST_SELECT_FILE = 100;
+    private ValueCallback<Uri[]> uploadMessage;
+    private static final int REQUEST_SELECT_FILE = 100;
     private final static int FILECHOOSER_RESULTCODE = 1;
     private static final int PERMISSION_REQUEST_CODE = 1;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        setupActionBar();
+        //setupActionBar();
 
         if (!DetectConnection.checkInternetConnection(MainActivity.this)) {
             buildDialog(MainActivity.this).show();
@@ -64,11 +68,13 @@ public class MainActivity extends AppCompatActivity {
             myWebView = findViewById(R.id.webview);
             setUpWebViewDefaults(myWebView);
 
+
+
         }
     }
 
     private void setupActionBar() {
-        getSupportActionBar().setDisplayOptions(ActionBar.DISPLAY_SHOW_CUSTOM);
+        Objects.requireNonNull(getSupportActionBar()).setDisplayOptions(ActionBar.DISPLAY_SHOW_CUSTOM);
         getSupportActionBar().setDisplayShowCustomEnabled(true);
         getSupportActionBar().setCustomView(R.layout.custom_imageview);
         View view =getSupportActionBar().getCustomView();
@@ -93,7 +99,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     private void setUpWebViewDefaults(WebView webView) {
 
         WebSettings settings = webView.getSettings();
@@ -129,7 +135,7 @@ public class MainActivity extends AppCompatActivity {
             webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         }
 
-        myWebView.loadUrl(START_URL);
+
 
         myWebView.setWebViewClient(new MyWebViewClient());
         myWebView.setWebChromeClient(new MyChromeWebView());
@@ -152,12 +158,14 @@ public class MainActivity extends AppCompatActivity {
                 request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
                 request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(url, contentDisposition, mimeType));
                 DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-                dm.enqueue(request);
+                Objects.requireNonNull(dm).enqueue(request);
                 Toast.makeText(getApplicationContext(), "Downloading File", Toast.LENGTH_LONG).show();
 
             }
         });
 
+        myWebView.addJavascriptInterface(new WebAppInterface(this), "Android");
+        myWebView.loadUrl(START_URL);
     }
 
     @Override
@@ -195,15 +203,38 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, String url) {
-            Log.d(TAG, "shouldOverrideUrlLoading: " + url);
+           // Log.d(TAG, "shouldOverrideUrlLoading: " + url);
             if (!DetectConnection.checkInternetConnection(getApplicationContext())) {
                 Toast.makeText(getApplicationContext(), "No Internet!", Toast.LENGTH_SHORT).show();
             } else {
-                view.loadUrl(url);
+
+                    view.loadUrl(url);
+
             }
             return true;
         }
 
+
+
+
+        @Override
+        public void onPageFinished(WebView view, String url) {
+            super.onPageFinished(view, url);
+//            view.loadUrl("javascript:console.log(\"onPageFinished\");");
+            if(url.contains("CommunityLoginPage")) {
+//                SharedPreferences.Editor editor = getSharedPreferences("userCredentials",MODE_PRIVATE).edit();
+//                editor.putString("usr", "gabor.demeter@attentioncrm.hu");
+//                editor.putString("pwd", "Welcome");
+//                editor.apply();
+
+                SharedPreferences prefs = getSharedPreferences("userCredentials", MODE_PRIVATE);
+
+                String usr = prefs.getString("usr", "");
+                String pwd = prefs.getString("pwd", "");
+                Log.d(TAG, "onPageFinished: user: " + usr + "pwd: "+ pwd);
+                view.loadUrl("javascript:populateForm(\"" +  usr + "\",\"" + pwd + "\");");
+            }
+       }
     }
 
     private class MyChromeWebView extends WebChromeClient {
@@ -255,6 +286,7 @@ public class MainActivity extends AppCompatActivity {
             i.setType("image/*");
             startActivityForResult(Intent.createChooser(i, "File Chooser"), FILECHOOSER_RESULTCODE);
         }
+
     }
 
 
@@ -273,7 +305,7 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-    public AlertDialog.Builder buildDialog(Context c) {
+    private AlertDialog.Builder buildDialog(Context c) {
 
         AlertDialog.Builder builder = new AlertDialog.Builder(c, R.style.Theme_AppCompat_Dialog_Alert);
         builder.setTitle(R.string.No_Connection);
@@ -317,6 +349,7 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(MainActivity.this, new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
         }
     }
+
 
 }
 
